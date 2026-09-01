@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>WILLWAY Dashboard</title>
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,600&family=Lora:wght@600&family=Playfair+Display:wght@700&display=swap"
+        rel="stylesheet"
+    >
+
+    <!-- Your CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="container">
+
+        <!-- Header -->
+        <div class="page-header">
+
+            <div class="eyebrow">
+                <img
+                    src="images/WillWay Logo.jpeg"
+                    alt="WILLWAY logo"
+                    class="nav-logo"
+                >
+            </div>
+
+            <h1 class="title">Featured Projects</h1>
+
+            <!-- Filters -->
+            <div class="filters-bar" id="filters-container">
+                <span class="fl">Sector:</span>
+
+                <button
+                    class="fb active"
+                    onclick="filter('All', this)"
+                >
+                    All
+                </button>
+            </div>
+
+        </div>
+
+        <!-- Portfolio -->
+        <div
+            class="portfolio-grid"
+            id="portfolio-grid"
+        ></div>
+
+    </div>
+
+
+    <!-- Footer -->
+    <footer class="main-footer">
+        <p>&copy; WILLWAY 2026. All rights reserved.</p>
+    </footer>
+
+
+<script>
+
+    /* =========================================================
+       AUTHENTICATION
+    ========================================================= */
+
+    const TOKEN_STORAGE_KEY = 'authToken';
+
+
+    function hasValidAuthToken() {
+
+        const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+
+        if (!token) {
+            return false;
+        }
+
+        try {
+
+            const tokenParts = token.split('.');
+
+            if (tokenParts.length !== 3) {
+                throw new Error('Malformed token');
+            }
+
+            const payload = JSON.parse(
+                atob(
+                    tokenParts[1]
+                        .replace(/-/g, '+')
+                        .replace(/_/g, '/')
+                )
+            );
+
+            const isValid =
+                Number.isFinite(payload.exp) &&
+                payload.exp > Math.floor(Date.now() / 1000);
+
+            if (!isValid) {
+                localStorage.removeItem(TOKEN_STORAGE_KEY);
+            }
+
+            return isValid;
+
+        } catch (error) {
+
+            console.error("Authentication error:", error);
+
+            localStorage.removeItem(TOKEN_STORAGE_KEY);
+
+            return false;
+        }
+    }
+
+
+    /* =========================================================
+       REDIRECT IF NOT LOGGED IN
+    ========================================================= */
+
+    if (!hasValidAuthToken()) {
+
+        window.location.replace('login.html');
+
+    } else {
+
+
+        /* =====================================================
+           THEME
+        ===================================================== */
+
+        const THEME = '#D23450';
+        const THEME1 = '#F9FAFB';
+
+
+        /* =====================================================
+           INDUSTRY CONFIG
+        ===================================================== */
+
+        const IC = {
+
+            'Finance': {
+                bg: THEME1
+            },
+
+            'HR': {
+                bg: THEME1
+            },
+
+            'Supply Chain': {
+                bg: THEME1
+            },
+
+            'Share Market': {
+                bg: THEME1
+            },
+
+            'Sales': {
+                bg: THEME1
+            },
+
+            'Operations': {
+                bg: THEME1
+            },
+
+            'Procurement': {
+                bg: THEME1
+            },
+
+            'Reconciliation': {
+                bg: THEME1
+            },
+
+            'Healthcare': {
+                bg: THEME1
+            },
+
+            'CRM': {
+                bg: THEME1
+            },
+
+            'Digital Marketing & SEO': {
+                bg: THEME1
+            }
+
+        };
+
+
+        /* =====================================================
+           GOOGLE SHEETS CONNECTION
+           
+           Spreadsheet ID:
+           1NE5c_nxOC4_eD5BblKEMld8vwy9eGjQafal7E2a3lyA
+
+           Sheet / Tab ID:
+           413226665
+        ===================================================== */
+
+        const sheetUrl =
+            "https://docs.google.com/spreadsheets/d/1NE5c_nxOC4_eD5BblKEMld8vwy9eGjQafal7E2a3lyA/export?format=csv&gid=413226665";
+
+
+        /* =====================================================
+           GLOBAL VARIABLES
+        ===================================================== */
+
+        let DATA = [];
+
+        let AF = 'All';
+
+
+        /* =====================================================
+           CSV PARSER
+           
+           Handles:
+           - commas
+           - quotes
+           - quoted values
+        ===================================================== */
+
+        function parseCSV(text) {
+
+            const rows = [];
+
+            let row = [];
+
+            let value = '';
+
+            let insideQuotes = false;
+
+
+            for (let i = 0; i < text.length; i++) {
+
+                const char = text[i];
+
+                const nextChar = text[i + 1];
+
+
+                /* Double quote inside quoted value */
+
+                if (char === '"' && insideQuotes && nextChar === '"') {
+
+                    value += '"';
+
+                    i++;
+
+                    continue;
+                }
+
+
+                /* Start / end quotes */
+
+                if (char === '"') {
+
+                    insideQuotes = !insideQuotes;
+
+                    continue;
+                }
+
+
+                /* Comma */
+
+                if (char === ',' && !insideQuotes) {
+
+                    row.push(value);
+
+                    value = '';
+
+                    continue;
+                }
+
+
+                /* New line */
+
+                if (
+                    (char === '\n' || char === '\r') &&
+                    !insideQuotes
+                ) {
+
+                    if (char === '\r' && nextChar === '\n') {
+                        i++;
+                    }
+
+                    row.push(value);
+
+                    rows.push(row);
+
+                    row = [];
+
+                    value = '';
+
+                    continue;
+                }
+
+
+                value += char;
+            }
+
+
+            /* Last row */
+
+            if (value !== '' || row.length > 0) {
+
+                row.push(value);
+
+                rows.push(row);
+            }
+
+
+            return rows;
+        }
+
+
+        /* =====================================================
+           LOAD DATA FROM GOOGLE SHEET
+        ===================================================== */
+
+        async function loadDataFromSheet() {
+
+            const grid =
+                document.getElementById('portfolio-grid');
+
+
+            /* Loading message */
+
+            grid.innerHTML = `
+                <div
+                    style="
+                        grid-column:1/-1;
+                        text-align:center;
+                        padding:100px;
+                        color:#777;
+                    "
+                >
+                    Loading projects...
+                </div>
+            `;
+
+
+            try {
+
+                console.log("Loading Google Sheet...");
+
+                console.log("Sheet URL:", sheetUrl);
+
+
+                /* Fetch Google Sheet */
+
+                const response =
+                    await fetch(sheetUrl, {
+                        method: 'GET',
+                        cache: 'no-cache'
+                    });
+
+
+                console.log(
+                    "Google Sheet response:",
+                    response.status
+                );
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        "Google Sheet request failed: " +
+                        response.status
+                    );
+                }
+
+
+                /* Get CSV */
+
+                const csvData =
+                    await response.text();
+
+
+                console.log(
+                    "CSV received:",
+                    csvData.substring(0, 500)
+                );
+
+
+                if (!csvData.trim()) {
+
+                    throw new Error(
+                        "Google Sheet returned empty data."
+                    );
+                }
+
+
+                /* Parse CSV */
+
+                const rows =
+                    parseCSV(csvData);
+
+
+                console.log(
+                    "Total CSV rows:",
+                    rows.length
+                );
+
+
+                if (rows.length < 2) {
+
+                    throw new Error(
+                        "No project data found in Google Sheet."
+                    );
+                }
+
+
+                /* =================================================
+                   EXPECTED COLUMNS
+
+                   Column A = Title
+                   Column B = Industry
+                   Column C = Description
+                   Column D = Dashboard URL
+                   Column E = Image URL
+                ================================================= */
+
+
+                DATA = rows
+                    .slice(1)
+                    .map((cols) => {
+
+                        return {
+
+                            title:
+                                (cols[0] || '').trim(),
+
+                            industry:
+                                (cols[1] || '').trim(),
+
+                            description:
+                                (cols[2] || '').trim(),
+
+                            dashboardUrl:
+                                (cols[3] || '').trim(),
+
+                            imageUrl:
+                                (cols[4] || '').trim()
+
+                        };
+
+                    })
+                    .filter(project => {
+
+                        return project.title !== '';
+                    });
+
+
+                console.log(
+                    "Projects loaded:",
+                    DATA
+                );
+
+
+                /* Check data */
+
+                if (DATA.length === 0) {
+
+                    throw new Error(
+                        "Google Sheet contains no valid project rows."
+                    );
+                }
+
+
+                /* Refresh dashboard */
+
+                refresh();
+
+
+            } catch (error) {
+
+                console.error(
+                    "ERROR LOADING GOOGLE SHEET:",
+                    error
+                );
+
+
+                grid.innerHTML = `
+
+                    <div
+                        style="
+                            grid-column:1/-1;
+                            text-align:center;
+                            padding:100px 20px;
+                            color:#999;
+                        "
+                    >
+
+                        <h3
+                            style="
+                                color:#555;
+                                margin-bottom:10px;
+                            "
+                        >
+                            Could not load projects
+                        </h3>
+
+                        <p>
+                            Please check your Google Sheet
+                            permissions and Sheet URL.
+                        </p>
+
+                        <p
+                            style="
+                                margin-top:10px;
+                                font-size:13px;
+                                color:#aaa;
+                            "
+                        >
+                            Make sure the Google Sheet is set to
+                            <strong>
+                                Anyone with the link → Viewer
+                            </strong>.
+                        </p>
+
+                    </div>
+
+                `;
+            }
+        }
+
+
+        /* =====================================================
+           GET INDUSTRY COLOR
+        ===================================================== */
+
+        function gc(industry) {
+
+            for (
+                const [key, value]
+                of Object.entries(IC)
+            ) {
+
+                if (
+                    industry &&
+                    industry
+                        .toLowerCase()
+                        .includes(key.toLowerCase())
+                ) {
+
+                    return value;
+                }
+            }
+
+
+            return {
+                bg: THEME1
+            };
+        }
+
+
+        /* =====================================================
+           BUILD FILTER BUTTONS
+        ===================================================== */
+
+        function buildFilters() {
+
+            const bar =
+                document.getElementById(
+                    'filters-container'
+                );
+
+
+            if (!bar) {
+                return;
+            }
+
+
+            /* Default All button */
+
+            bar.innerHTML = `
+
+                <span class="fl">
+                    Sector:
+                </span>
+
+                <button
+                    class="fb active"
+                    onclick="filter('All', this)"
+                >
+                    All
+                </button>
+
+            `;
+
+
+            /* Get unique industries */
+
+            const industries =
+                [
+                    ...new Set(
+                        DATA
+                            .map(project => project.industry)
+                            .filter(industry => industry)
+                    )
+                ];
+
+
+            /* Create buttons */
+
+            industries.forEach(industry => {
+
+                const button =
+                    document.createElement('button');
+
+
+                button.className = 'fb';
+
+                button.textContent = industry;
+
+
+                button.onclick = function () {
+
+                    filter(
+                        industry,
+                        this
+                    );
+
+                };
+
+
+                bar.appendChild(button);
+
+            });
+
+        }
+
+
+        /* =====================================================
+           FILTER PROJECTS
+        ===================================================== */
+
+        function filter(value, button) {
+
+            AF = value;
+
+
+            /* Remove active */
+
+            document
+                .querySelectorAll('.fb')
+                .forEach(btn => {
+
+                    btn.classList.remove('active');
+
+                });
+
+
+            /* Add active */
+
+            if (button) {
+
+                button.classList.add('active');
+
+            }
+
+
+            /* Filter data */
+
+            const filteredData =
+                value === 'All'
+                    ? DATA
+                    : DATA.filter(
+                        project =>
+                            project.industry === value
+                    );
+
+
+            /* Render */
+
+            render(filteredData);
+        }
+
+
+        /* =====================================================
+           ESCAPE HTML
+           
+           Prevents HTML from breaking when values contain
+           special characters.
+        ===================================================== */
+
+        function escapeHTML(value) {
+
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+
+        /* =====================================================
+           RENDER PROJECTS
+        ===================================================== */
+
+        function render(list) {
+
+            const grid =
+                document.getElementById(
+                    'portfolio-grid'
+                );
+
+
+            /* No projects */
+
+            if (!list.length) {
+
+                grid.innerHTML = `
+
+                    <div
+                        style="
+                            grid-column:1/-1;
+                            text-align:center;
+                            padding:100px;
+                        "
+                    >
+                        No projects found.
+                    </div>
+
+                `;
+
+                return;
+            }
+
+
+            /* Create cards */
+
+            grid.innerHTML = list
+                .map(project => {
+
+                    const color =
+                        gc(project.industry);
+
+
+                    const title =
+                        escapeHTML(project.title);
+
+                    const industry =
+                        escapeHTML(project.industry);
+
+                    const description =
+                        escapeHTML(project.description);
+
+                    const dashboardUrl =
+                        escapeHTML(project.dashboardUrl);
+
+                    const imageUrl =
+                        escapeHTML(project.imageUrl);
+
+
+                    return `
+
+                        <div
+                            class="portfolio-card"
+                            onclick="openDashboard('${dashboardUrl}')"
+                        >
+
+                            <div class="card-header">
+
+                                <span
+                                    class="industry-badge"
+                                    style="
+                                        background-color:${color.bg};
+                                    "
+                                >
+                                    ${industry}
+                                </span>
+
+
+                                <div class="image-container">
+
+                                    <img
+                                        src="${imageUrl}"
+                                        alt="${title}"
+                                        onerror="
+                                            this.onerror=null;
+                                            this.src='https://via.placeholder.com/400x200?text=Preview+Coming+Soon';
+                                        "
+                                    >
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="portfolio-info">
+
+                                <h3>
+                                    ${title}
+                                </h3>
+
+
+                                <div
+                                    class="desc-container"
+                                    data-fulltext="${description}"
+                                >
+
+                                    <p class="description">
+                                        ${description}
+                                    </p>
+
+                                </div>
+
+
+                                <div
+                                    class="open-btn"
+                                    style="
+                                        background:${THEME};
+                                    "
+                                >
+                                    View Dashboard →
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    `;
+
+                })
+                .join('');
+        }
+
+
+        /* =====================================================
+           OPEN DASHBOARD
+        ===================================================== */
+
+        function openDashboard(url) {
+
+            if (!url) {
+
+                console.error(
+                    "Dashboard URL is missing."
+                );
+
+                return;
+            }
+
+
+            window.open(
+                url,
+                '_blank',
+                'noopener,noreferrer'
+            );
+        }
+
+
+        /* =====================================================
+           REFRESH
+        ===================================================== */
+
+        function refresh() {
+
+            buildFilters();
+
+
+            const filteredData =
+                AF === 'All'
+                    ? DATA
+                    : DATA.filter(
+                        project =>
+                            project.industry === AF
+                    );
+
+
+            render(filteredData);
+        }
+
+
+        /* =====================================================
+           START
+        ===================================================== */
+
+        loadDataFromSheet();
+
+    }
+
+</script>
+
+</body>
+</html>

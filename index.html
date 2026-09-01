@@ -503,23 +503,6 @@ async function loadDataFromSheet() {
     try {
 
 
-        console.log(
-            "================================="
-        );
-
-        console.log(
-            "Loading Google Sheet..."
-        );
-
-        console.log(
-            "Sheet URL:",
-            sheetUrl
-        );
-
-        console.log(
-            "================================="
-        );
-
 
 
         /*
@@ -534,15 +517,6 @@ async function loadDataFromSheet() {
                     cache: 'no-cache'
                 }
             );
-
-
-
-        console.log(
-            "Google Sheet response:",
-            response.status
-        );
-
-
 
         /*
             Check HTTP response
@@ -564,17 +538,6 @@ async function loadDataFromSheet() {
 
         const csvData =
             await response.text();
-
-
-
-        console.log(
-            "CSV received:"
-        );
-
-        console.log(
-            csvData.substring(0, 500)
-        );
-
 
 
         /*
@@ -623,13 +586,7 @@ async function loadDataFromSheet() {
 
 
 
-        console.log(
-            "Total CSV rows:",
-            rows.length
-        );
-
-
-
+ 
         /*
             Need header + data
         */
@@ -653,13 +610,6 @@ async function loadDataFromSheet() {
            Column D = Dashboard URL
            Column E = Image URL
         ================================================= */
-
-
-
-        console.log(
-            "Header row:",
-            rows[0]
-        );
 
 
 
@@ -706,13 +656,6 @@ async function loadDataFromSheet() {
 
 
 
-        console.log(
-            "Projects loaded:",
-            DATA
-        );
-
-
-
         /*
             Check data
         */
@@ -724,12 +667,6 @@ async function loadDataFromSheet() {
             );
 
         }
-
-
-
-        console.log(
-            `Successfully loaded ${DATA.length} projects.`
-        );
 
 
 

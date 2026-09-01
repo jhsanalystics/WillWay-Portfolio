@@ -228,49 +228,17 @@ const THEME1 =
 
 const IC = {
 
-    'Finance': {
-        bg: THEME1
-    },
-
-    'HR': {
-        bg: THEME1
-    },
-
-    'Supply Chain': {
-        bg: THEME1
-    },
-
-    'Share Market': {
-        bg: THEME1
-    },
-
-    'Sales': {
-        bg: THEME1
-    },
-
-    'Operations': {
-        bg: THEME1
-    },
-
-    'Procurement': {
-        bg: THEME1
-    },
-
-    'Reconciliation': {
-        bg: THEME1
-    },
-
-    'Healthcare': {
-        bg: THEME1
-    },
-
-    'CRM': {
-        bg: THEME1
-    },
-
-    'Digital Marketing & SEO': {
-        bg: THEME1
-    }
+    'Finance': { bg: THEME1 },
+    'HR': { bg: THEME1 },
+    'Supply Chain': { bg: THEME1 },
+    'Share Market': { bg: THEME1 },
+    'Sales': { bg: THEME1 },
+    'Operations': { bg: THEME1 },
+    'Procurement': { bg: THEME1 },
+    'Reconciliation': { bg: THEME1 },
+    'Healthcare': { bg: THEME1 },
+    'CRM': { bg: THEME1 },
+    'Digital Marketing & SEO': { bg: THEME1 }
 
 };
 
@@ -281,19 +249,50 @@ const IC = {
 ========================================================= */
 
 /*
-    IMPORTANT:
+    HOW TO GET THESE VALUES:
 
-    Do NOT use the normal Google Sheets /edit URL.
+    1. Open your Google Sheet.
+    2. Look at the URL bar. It looks like:
 
-    Correct format:
+       https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit?gid=SHEET_GID#gid=SHEET_GID
 
-    /export?format=csv&gid=YOUR_GID
+    3. Copy the SPREADSHEET_ID and SHEET_GID into the two
+       constants below.
+
+    4. Make sure the sheet is shared as:
+       Anyone with the link -> Viewer
+
+    ---------------------------------------------------------
+
+    WHY THIS URL FORMAT (gviz/tq):
+
+    Plain /export?format=csv links sometimes fail on certain
+    Google accounts, returning a login/interstitial HTML page
+    instead of CSV (this is a known Google-side inconsistency,
+    not a bug in this code). The /gviz/tq endpoint is Google's
+    Visualization API and is generally more reliable for public,
+    anonymous CSV access.
+
+    If THIS ALSO FAILS with "Google returned an HTML page":
+
+    -> Go to File -> Share -> Publish to web in your Google Sheet,
+       choose your data tab, set format to CSV, click Publish,
+       and paste the generated link (looks like
+       https://docs.google.com/spreadsheets/d/e/2PACX-.../pub?output=csv)
+       directly into the PUBLISHED_CSV_URL constant below instead.
+       That endpoint always works regardless of account quirks.
 */
-// const SPREADSHEET_ID = '1ah5UmcQYI8FkM9QzX7xd-g6P_Bj2XtcNAItrHzMWdJY';
-// const SHEET_GID = '32159893';
 
-const sheetUrl =
-    `https://docs.google.com/spreadsheets/d/1iDEStX3iMiwrxbmXO8-RHTLoJGn2Mw_fwiq3S7vwb5s/edit?gid=549367320#gid=549367320`;
+const SPREADSHEET_ID = '1iDEStX3iMiwrxbmXO8-RHTLoJGn2Mw_fwiq3S7vwb5s';
+const SHEET_GID = '549367320';
+
+// Primary attempt: Google Visualization API (more reliable than /export)
+const GVIZ_URL =
+    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}`;
+
+// Fallback: paste your "Publish to web" CSV link here if GVIZ_URL fails.
+// Leave as empty string '' if you don't have one yet.
+const PUBLISHED_CSV_URL = '';
 
 /* =========================================================
    GLOBAL VARIABLES
@@ -326,16 +325,9 @@ function parseCSV(text) {
         i++
     ) {
 
-        const char =
-            text[i];
+        const char = text[i];
+        const nextChar = text[i + 1];
 
-        const nextChar =
-            text[i + 1];
-
-
-        /*
-            Double quote inside quoted value
-        */
 
         if (
             char === '"' &&
@@ -344,33 +336,19 @@ function parseCSV(text) {
         ) {
 
             value += '"';
-
             i++;
-
             continue;
 
         }
 
-
-
-        /*
-            Start / end quotes
-        */
 
         if (char === '"') {
 
-            insideQuotes =
-                !insideQuotes;
-
+            insideQuotes = !insideQuotes;
             continue;
 
         }
 
-
-
-        /*
-            Comma
-        */
 
         if (
             char === ',' &&
@@ -378,43 +356,25 @@ function parseCSV(text) {
         ) {
 
             row.push(value);
-
             value = '';
-
             continue;
 
         }
 
 
-
-        /*
-            New line
-        */
-
         if (
-            (char === '\n' ||
-             char === '\r') &&
+            (char === '\n' || char === '\r') &&
             !insideQuotes
         ) {
 
-            if (
-                char === '\r' &&
-                nextChar === '\n'
-            ) {
-
+            if (char === '\r' && nextChar === '\n') {
                 i++;
-
             }
 
-
             row.push(value);
-
             rows.push(row);
-
             row = [];
-
             value = '';
-
             continue;
 
         }
@@ -425,24 +385,54 @@ function parseCSV(text) {
     }
 
 
-
-    /*
-        Last row
-    */
-
-    if (
-        value !== '' ||
-        row.length > 0
-    ) {
-
+    if (value !== '' || row.length > 0) {
         row.push(value);
-
         rows.push(row);
-
     }
 
 
     return rows;
+
+}
+
+
+
+/* =========================================================
+   FETCH HELPER — checks for HTML interstitial
+========================================================= */
+
+async function fetchCSV(url) {
+
+    const response = await fetch(
+        url,
+        {
+            method: 'GET',
+            cache: 'no-cache'
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error(
+            `Request failed: ${response.status} ${response.statusText}`
+        );
+    }
+
+    const csvData = await response.text();
+
+    if (!csvData.trim()) {
+        throw new Error("Google Sheet returned empty data.");
+    }
+
+    const trimmed = csvData.trim();
+
+    if (
+        trimmed.startsWith('<!DOCTYPE html') ||
+        trimmed.startsWith('<html')
+    ) {
+        throw new Error("HTML_INTERSTITIAL");
+    }
+
+    return csvData;
 
 }
 
@@ -455,151 +445,109 @@ function parseCSV(text) {
 async function loadDataFromSheet() {
 
 
-    const grid =
-        document.getElementById(
-            'portfolio-grid'
-        );
+    const grid = document.getElementById('portfolio-grid');
 
-
-    /*
-        Loading message
-    */
 
     grid.innerHTML = `
-
-        <div
-            style="
-                grid-column:1/-1;
-                text-align:center;
-                padding:100px 20px;
-                color:#777;
-            "
-        >
-
-            <div
-                style="
-                    font-size:18px;
-                    margin-bottom:10px;
-                "
-            >
-                Loading projects...
-            </div>
-
-            <div
-                style="
-                    font-size:13px;
-                    color:#aaa;
-                "
-            >
-                Connecting to Google Sheets
-            </div>
-
+        <div style="grid-column:1/-1;text-align:center;padding:100px 20px;color:#777;">
+            <div style="font-size:18px;margin-bottom:10px;">Loading projects...</div>
+            <div style="font-size:13px;color:#aaa;">Connecting to Google Sheets</div>
         </div>
-
     `;
 
 
+    let csvData = null;
+    let lastError = null;
+
+
+    /*
+        Try GVIZ endpoint first
+    */
 
     try {
 
+        csvData = await fetchCSV(GVIZ_URL);
+
+    } catch (error) {
+
+        lastError = error;
+        console.warn("GVIZ endpoint failed, will try fallback if available:", error.message);
+
+    }
 
 
+    /*
+        Fallback to published CSV URL if GVIZ failed
+        and a published URL has been provided
+    */
 
-        /*
-            Fetch Google Sheet CSV
-        */
+    if (!csvData && PUBLISHED_CSV_URL) {
 
-        const response =
-            await fetch(
-                sheetUrl,
-                {
-                    method: 'GET',
-                    cache: 'no-cache'
-                }
-            );
+        try {
 
-        /*
-            Check HTTP response
-        */
+            csvData = await fetchCSV(PUBLISHED_CSV_URL);
 
-        if (!response.ok) {
+        } catch (error) {
 
-            throw new Error(
-                `Google Sheet request failed: ${response.status} ${response.statusText}`
-            );
-
-        }
-
-
-
-        /*
-            Read CSV
-        */
-
-        const csvData =
-            await response.text();
-
-
-        /*
-            Empty check
-        */
-
-        if (!csvData.trim()) {
-
-            throw new Error(
-                "Google Sheet returned empty data."
-            );
+            lastError = error;
+            console.error("Published CSV fallback also failed:", error.message);
 
         }
 
+    }
 
 
-        /*
-            Check if Google returned
-            an HTML login/permission page
-        */
+    /*
+        Both methods failed
+    */
 
-        if (
-            csvData
-                .trim()
-                .startsWith('<!DOCTYPE html')
-            ||
-            csvData
-                .trim()
-                .startsWith('<html')
-        ) {
+    if (!csvData) {
 
-            throw new Error(
-                "Google returned an HTML page instead of CSV. Check Google Sheet permissions."
-            );
+        const isInterstitial =
+            lastError && lastError.message === "HTML_INTERSTITIAL";
 
-        }
+        const errorMessage = isInterstitial
+            ? "Google returned an HTML page instead of CSV. This sheet needs to be published via File > Share > Publish to web, then paste that link into PUBLISHED_CSV_URL in the code."
+            : (lastError ? lastError.message : "Unknown error loading sheet.");
+
+        console.error("=================================");
+        console.error("ERROR LOADING GOOGLE SHEET:");
+        console.error(errorMessage);
+        console.error("=================================");
+
+        grid.innerHTML = `
+            <div style="grid-column:1/-1;text-align:center;padding:80px 20px;color:#999;">
+                <h3 style="color:#555;margin-bottom:15px;">Could not load projects</h3>
+                <p style="margin-bottom:10px;">Unable to retrieve data from Google Sheets.</p>
+                <p style="font-size:13px;color:#aaa;margin-bottom:20px;">
+                    Please check your Google Sheet permissions and Sheet URL.
+                </p>
+                <div style="max-width:600px;margin:auto;padding:15px;background:#f8f8f8;border-radius:8px;font-size:12px;color:#777;word-break:break-word;">
+                    <strong>Error:</strong> ${escapeHTML(errorMessage)}
+                </div>
+                <p style="margin-top:20px;font-size:13px;color:#aaa;">
+                    Google Sheet should be accessible as:
+                    <strong>Anyone with the link &rarr; Viewer</strong>
+                </p>
+            </div>
+        `;
+
+        return;
+
+    }
 
 
+    /*
+        Parse CSV
+    */
 
-        /*
-            Parse CSV
-        */
+    try {
 
-        const rows =
-            parseCSV(csvData);
-
-
-
- 
-        /*
-            Need header + data
-        */
+        const rows = parseCSV(csvData);
 
         if (rows.length < 2) {
-
-            throw new Error(
-                "No project data found in Google Sheet."
-            );
-
+            throw new Error("No project data found in Google Sheet.");
         }
-
-
 
         /* =================================================
            EXPECTED COLUMNS
@@ -611,179 +559,37 @@ async function loadDataFromSheet() {
            Column E = Image URL
         ================================================= */
 
-
-
-        /*
-            Convert rows to objects
-        */
-
-        DATA =
-            rows
-                .slice(1)
-                .map(
-                    (cols) => {
-
-                        return {
-
-                            title:
-                                (cols[0] || '')
-                                    .trim(),
-
-                            industry:
-                                (cols[1] || '')
-                                    .trim(),
-
-                            description:
-                                (cols[2] || '')
-                                    .trim(),
-
-                            dashboardUrl:
-                                (cols[3] || '')
-                                    .trim(),
-
-                            imageUrl:
-                                (cols[4] || '')
-                                    .trim()
-
-                        };
-
-                    }
-                )
-                .filter(
-                    project =>
-                        project.title !== ''
-                );
-
-
-
-        /*
-            Check data
-        */
+        DATA = rows
+            .slice(1)
+            .map((cols) => {
+                return {
+                    title: (cols[0] || '').trim(),
+                    industry: (cols[1] || '').trim(),
+                    description: (cols[2] || '').trim(),
+                    dashboardUrl: (cols[3] || '').trim(),
+                    imageUrl: (cols[4] || '').trim()
+                };
+            })
+            .filter(project => project.title !== '');
 
         if (DATA.length === 0) {
-
-            throw new Error(
-                "Google Sheet contains no valid project rows."
-            );
-
+            throw new Error("Google Sheet contains no valid project rows.");
         }
-
-
-
-        /*
-            Refresh dashboard
-        */
 
         refresh();
 
-
     } catch (error) {
 
-
-        console.error(
-            "================================="
-        );
-
-        console.error(
-            "ERROR LOADING GOOGLE SHEET:"
-        );
-
-        console.error(
-            error
-        );
-
-        console.error(
-            "================================="
-        );
-
-
-
-        /*
-            Display error
-        */
+        console.error("=================================");
+        console.error("ERROR PARSING GOOGLE SHEET DATA:");
+        console.error(error);
+        console.error("=================================");
 
         grid.innerHTML = `
-
-            <div
-                style="
-                    grid-column:1/-1;
-                    text-align:center;
-                    padding:80px 20px;
-                    color:#999;
-                "
-            >
-
-                <h3
-                    style="
-                        color:#555;
-                        margin-bottom:15px;
-                    "
-                >
-                    Could not load projects
-                </h3>
-
-
-                <p
-                    style="
-                        margin-bottom:10px;
-                    "
-                >
-                    Unable to retrieve data from Google Sheets.
-                </p>
-
-
-                <p
-                    style="
-                        font-size:13px;
-                        color:#aaa;
-                        margin-bottom:20px;
-                    "
-                >
-                    Please check your Google Sheet
-                    permissions and Sheet URL.
-                </p>
-
-
-                <div
-                    style="
-                        max-width:600px;
-                        margin:auto;
-                        padding:15px;
-                        background:#f8f8f8;
-                        border-radius:8px;
-                        font-size:12px;
-                        color:#777;
-                        word-break:break-word;
-                    "
-                >
-
-                    <strong>
-                        Error:
-                    </strong>
-
-                    ${escapeHTML(error.message)}
-
-                </div>
-
-
-                <p
-                    style="
-                        margin-top:20px;
-                        font-size:13px;
-                        color:#aaa;
-                    "
-                >
-
-                    Google Sheet should be accessible as:
-
-                    <strong>
-                        Anyone with the link → Viewer
-                    </strong>
-
-                </p>
-
+            <div style="grid-column:1/-1;text-align:center;padding:80px 20px;color:#999;">
+                <h3 style="color:#555;margin-bottom:15px;">Could not load projects</h3>
+                <p style="margin-bottom:10px;">${escapeHTML(error.message)}</p>
             </div>
-
         `;
 
     }
@@ -798,34 +604,18 @@ async function loadDataFromSheet() {
 
 function gc(industry) {
 
-
-    for (
-        const [key, value]
-        of Object.entries(IC)
-    ) {
-
+    for (const [key, value] of Object.entries(IC)) {
 
         if (
             industry &&
-            industry
-                .toLowerCase()
-                .includes(
-                    key.toLowerCase()
-                )
+            industry.toLowerCase().includes(key.toLowerCase())
         ) {
-
             return value;
-
         }
 
     }
 
-
-    return {
-
-        bg: THEME1
-
-    };
+    return { bg: THEME1 };
 
 }
 
@@ -837,102 +627,36 @@ function gc(industry) {
 
 function buildFilters() {
 
-
-    const bar =
-        document.getElementById(
-            'filters-container'
-        );
-
+    const bar = document.getElementById('filters-container');
 
     if (!bar) {
-
         return;
-
     }
 
-
-
-    /*
-        Default All button
-    */
-
     bar.innerHTML = `
-
-        <span class="fl">
-            Sector:
-        </span>
-
-        <button
-            class="fb active"
-            onclick="filter('All', this)"
-        >
-            All
-        </button>
-
+        <span class="fl">Sector:</span>
+        <button class="fb active" onclick="filter('All', this)">All</button>
     `;
 
+    const industries = [
+        ...new Set(
+            DATA
+                .map(project => project.industry)
+                .filter(industry => industry)
+        )
+    ];
 
+    industries.forEach(industry => {
 
-    /*
-        Get unique industries
-    */
+        const button = document.createElement('button');
+        button.className = 'fb';
+        button.textContent = industry;
+        button.onclick = function () {
+            filter(industry, this);
+        };
+        bar.appendChild(button);
 
-    const industries =
-        [
-            ...new Set(
-                DATA
-                    .map(
-                        project =>
-                            project.industry
-                    )
-                    .filter(
-                        industry =>
-                            industry
-                    )
-            )
-        ];
-
-
-
-    /*
-        Create buttons
-    */
-
-    industries.forEach(
-        industry => {
-
-
-            const button =
-                document.createElement(
-                    'button'
-                );
-
-
-            button.className =
-                'fb';
-
-
-            button.textContent =
-                industry;
-
-
-            button.onclick =
-                function () {
-
-                    filter(
-                        industry,
-                        this
-                    );
-
-                };
-
-
-            bar.appendChild(
-                button
-            );
-
-        }
-    );
+    });
 
 }
 
@@ -942,70 +666,24 @@ function buildFilters() {
    FILTER PROJECTS
 ========================================================= */
 
-function filter(
-    value,
-    button
-) {
-
+function filter(value, button) {
 
     AF = value;
 
-
-
-    /*
-        Remove active
-    */
-
-    document
-        .querySelectorAll('.fb')
-        .forEach(
-            btn => {
-
-                btn.classList.remove(
-                    'active'
-                );
-
-            }
-        );
-
-
-
-    /*
-        Add active
-    */
+    document.querySelectorAll('.fb').forEach(btn => {
+        btn.classList.remove('active');
+    });
 
     if (button) {
-
-        button.classList.add(
-            'active'
-        );
-
+        button.classList.add('active');
     }
-
-
-
-    /*
-        Filter data
-    */
 
     const filteredData =
         value === 'All'
             ? DATA
-            : DATA.filter(
-                project =>
-                    project.industry ===
-                    value
-            );
+            : DATA.filter(project => project.industry === value);
 
-
-
-    /*
-        Render
-    */
-
-    render(
-        filteredData
-    );
+    render(filteredData);
 
 }
 
@@ -1017,30 +695,12 @@ function filter(
 
 function escapeHTML(value) {
 
-
-    return String(
-        value || ''
-    )
-        .replace(
-            /&/g,
-            '&amp;'
-        )
-        .replace(
-            /</g,
-            '&lt;'
-        )
-        .replace(
-            />/g,
-            '&gt;'
-        )
-        .replace(
-            /"/g,
-            '&quot;'
-        )
-        .replace(
-            /'/g,
-            '&#039;'
-        );
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 
 }
 
@@ -1052,185 +712,56 @@ function escapeHTML(value) {
 
 function render(list) {
 
-
-    const grid =
-        document.getElementById(
-            'portfolio-grid'
-        );
-
-
-
-    /*
-        No projects
-    */
+    const grid = document.getElementById('portfolio-grid');
 
     if (!list.length) {
-
-
         grid.innerHTML = `
-
-            <div
-                style="
-                    grid-column:1/-1;
-                    text-align:center;
-                    padding:100px;
-                "
-            >
-
+            <div style="grid-column:1/-1;text-align:center;padding:100px;">
                 No projects found.
-
             </div>
-
         `;
-
-
         return;
-
     }
 
+    grid.innerHTML = list
+        .map(project => {
 
+            const color = gc(project.industry);
+            const title = escapeHTML(project.title);
+            const industry = escapeHTML(project.industry);
+            const description = escapeHTML(project.description);
+            const dashboardUrl = escapeHTML(project.dashboardUrl);
+            const imageUrl = escapeHTML(project.imageUrl);
 
-    /*
-        Create cards
-    */
-
-    grid.innerHTML =
-        list
-            .map(
-                project => {
-
-
-                    const color =
-                        gc(
-                            project.industry
-                        );
-
-
-
-                    const title =
-                        escapeHTML(
-                            project.title
-                        );
-
-
-                    const industry =
-                        escapeHTML(
-                            project.industry
-                        );
-
-
-                    const description =
-                        escapeHTML(
-                            project.description
-                        );
-
-
-                    const dashboardUrl =
-                        escapeHTML(
-                            project.dashboardUrl
-                        );
-
-
-                    const imageUrl =
-                        escapeHTML(
-                            project.imageUrl
-                        );
-
-
-
-                    return `
-
-                        <div
-                            class="portfolio-card"
-                            onclick="openDashboard('${dashboardUrl}')"
-                        >
-
-                            <div
-                                class="card-header"
+            return `
+                <div class="portfolio-card" onclick="openDashboard('${dashboardUrl}')">
+                    <div class="card-header">
+                        <span class="industry-badge" style="background-color:${color.bg};">
+                            ${industry}
+                        </span>
+                        <div class="image-container">
+                            <img
+                                src="${imageUrl}"
+                                alt="${title}"
+                                loading="lazy"
+                                onerror="this.onerror=null; this.src='https://via.placeholder.com/400x200?text=Preview+Coming+Soon';"
                             >
-
-
-                                <span
-                                    class="industry-badge"
-                                    style="
-                                        background-color:${color.bg};
-                                    "
-                                >
-
-                                    ${industry}
-
-                                </span>
-
-
-
-                                <div
-                                    class="image-container"
-                                >
-
-                                    <img
-                                        src="${imageUrl}"
-                                        alt="${title}"
-                                        loading="lazy"
-                                        onerror="
-                                            this.onerror=null;
-                                            this.src='https://via.placeholder.com/400x200?text=Preview+Coming+Soon';
-                                        "
-                                    >
-
-                                </div>
-
-
-                            </div>
-
-
-
-                            <div
-                                class="portfolio-info"
-                            >
-
-                                <h3>
-                                    ${title}
-                                </h3>
-
-
-
-                                <div
-                                    class="desc-container"
-                                    data-fulltext="${description}"
-                                >
-
-                                    <p
-                                        class="description"
-                                    >
-                                        ${description}
-                                    </p>
-
-                                </div>
-
-
-
-                                <div
-                                    class="open-btn"
-                                    style="
-                                        background:${THEME};
-                                    "
-                                >
-
-                                    View Dashboard →
-
-                                </div>
-
-
-                            </div>
-
-
                         </div>
+                    </div>
+                    <div class="portfolio-info">
+                        <h3>${title}</h3>
+                        <div class="desc-container" data-fulltext="${description}">
+                            <p class="description">${description}</p>
+                        </div>
+                        <div class="open-btn" style="background:${THEME};">
+                            View Dashboard &rarr;
+                        </div>
+                    </div>
+                </div>
+            `;
 
-                    `;
-
-                }
-            )
-            .join('');
+        })
+        .join('');
 
 }
 
@@ -1242,23 +773,12 @@ function render(list) {
 
 function openDashboard(url) {
 
-
     if (!url) {
-
-        console.error(
-            "Dashboard URL is missing."
-        );
-
+        console.error("Dashboard URL is missing.");
         return;
-
     }
 
-
-    window.open(
-        url,
-        '_blank',
-        'noopener,noreferrer'
-    );
+    window.open(url, '_blank', 'noopener,noreferrer');
 
 }
 
@@ -1270,23 +790,14 @@ function openDashboard(url) {
 
 function refresh() {
 
-
     buildFilters();
-
 
     const filteredData =
         AF === 'All'
             ? DATA
-            : DATA.filter(
-                project =>
-                    project.industry ===
-                    AF
-            );
+            : DATA.filter(project => project.industry === AF);
 
-
-    render(
-        filteredData
-    );
+    render(filteredData);
 
 }
 
